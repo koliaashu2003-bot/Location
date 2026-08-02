@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -11,6 +12,11 @@ Future<void> main() async {
   // present yet the app still runs; Firestore writes simply no-op.
   try {
     await Firebase.initializeApp();
+    // Anonymous sign-in so Firestore writes satisfy the security rules
+    // (request.auth != null). No account creation needed by the user.
+    if (FirebaseAuth.instance.currentUser == null) {
+      await FirebaseAuth.instance.signInAnonymously();
+    }
   } catch (_) {
     // Ignore — allow the app to launch so the user can configure settings.
   }

@@ -3,11 +3,11 @@ rules_version = '2';
 // Family Location Tracker security rules.
 //
 // Only authenticated users can read or write. This keeps the data private to
-// people you have created accounts for in Firebase Auth (Email/Password).
+// people you have created accounts for in Firebase Auth.
 //
-// Note: the Flutter agent writes with the same project but no user sign-in by
-// default. If you want the agent's writes to be authenticated too, sign the
-// agent in with a dedicated service account / email login and keep this rule.
+// The dashboard signs in with Email/Password; the phone agent signs in
+// Anonymously on startup. Both satisfy `request.auth != null`, so enable both
+// providers in Firebase Console → Authentication → Sign-in method.
 // For a purely private family setup on the free tier, this is a sensible
 // baseline — tighten further per-device if you wish.
 service cloud.firestore {

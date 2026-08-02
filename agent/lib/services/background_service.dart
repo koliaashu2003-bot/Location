@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -62,9 +63,15 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
 
-  // Firebase must be re-initialised inside the background isolate.
+  // Firebase must be re-initialised inside the background isolate, which runs
+  // in its own memory space with no access to the UI isolate's auth session.
   try {
     await Firebase.initializeApp();
+    // Sign in anonymously here too — this isolate performs the Firestore
+    // writes, so it needs its own authenticated session to pass the rules.
+    if (FirebaseAuth.instance.currentUser == null) {
+      await FirebaseAuth.instance.signInAnonymously();
+    }
   } catch (_) {
     // Already initialised or config missing — continue; Firestore writes
     // will simply no-op if unavailable.

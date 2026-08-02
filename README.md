@@ -62,9 +62,12 @@ family-tracker/
    named `family-tracker`.
 2. **Build → Firestore Database → Create database.** Start in **test mode**
    for initial setup (you'll lock it down with the included rules later).
-3. **Build → Authentication → Get started → Email/Password → Enable.**
-   Then **Users → Add user** and create at least one account — you'll use it to
-   sign into the dashboard.
+3. **Build → Authentication → Get started**, then enable **two** sign-in
+   providers:
+   - **Email/Password** → Enable. Then **Users → Add user** and create at
+     least one account — you'll use it to sign into the dashboard.
+   - **Anonymous** → Enable. The phone agent uses this to write to Firestore
+     without any account setup.
 4. **Add an Android app** with package name **`com.family.tracker.agent`**.
    - Download **`google-services.json`** and place it at
      **`agent/android/app/google-services.json`**
@@ -86,17 +89,15 @@ firebase use --add          # pick your family-tracker project
 firebase deploy --only firestore:rules
 ```
 
-> **Important — agent writes and auth.** The included rules require
-> `request.auth != null`. The Flutter agent as written does **not** sign in, so
-> for it to write to Firestore you have two options:
+> **Agent writes and auth.** The included rules require `request.auth != null`.
+> The agent signs in **anonymously** on startup (in both the UI and the
+> background isolate) so its Firestore writes satisfy the rules with no account
+> setup. Just enable it once in the console:
 >
-> - **Easiest for testing:** keep Firestore in **test mode** while you try it
->   out (rules allow open access for 30 days).
-> - **Recommended for real use:** enable **Anonymous** sign-in
->   (Authentication → Sign-in method → Anonymous) and add
->   `firebase_auth` + a `signInAnonymously()` call in the agent so its writes
->   satisfy the rules. Telegram delivery works regardless — it doesn't touch
->   Firestore.
+> **Authentication → Sign-in method → Anonymous → Enable.**
+>
+> That's the only step — no code changes needed. Telegram delivery works
+> regardless, since it doesn't touch Firestore.
 
 ---
 
