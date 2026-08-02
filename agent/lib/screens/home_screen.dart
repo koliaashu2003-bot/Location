@@ -209,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Switch(
                   value: _tracking,
-                  activeColor: Colors.green,
+                  activeThumbColor: Colors.green,
                   onChanged: _toggleTracking,
                 ),
               ],

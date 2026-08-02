@@ -56,7 +56,7 @@ class FirebaseService {
         'deviceName': deviceName,
         'apps': apps.map((a) => a.toMap()).toList(),
         'totalMinutes':
-            apps.fold<int>(0, (sum, a) => sum + a.durationMinutes),
+            apps.fold<int>(0, (total, a) => total + a.durationMinutes),
       });
 
       await _db.collection('screentime').doc(deviceId).set(
