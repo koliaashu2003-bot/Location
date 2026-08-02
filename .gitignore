@@ -1,0 +1,27 @@
+# --- Secrets / Firebase ---
+agent/android/app/google-services.json
+dashboard/.env
+dashboard/.env.local
+
+# --- Flutter ---
+agent/.dart_tool/
+agent/.flutter-plugins
+agent/.flutter-plugins-dependencies
+agent/.packages
+agent/build/
+agent/android/.gradle/
+agent/android/local.properties
+agent/android/app/debug/
+agent/android/app/profile/
+agent/android/app/release/
+agent/**/*.iml
+agent/.idea/
+
+# --- Node / Vite ---
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.vite/
+
+# --- OS / editor ---
+.DS_Store
+*.log

@@ -1,0 +1,30 @@
+{
+  "_comment": "RENAME this file to google-services.json after downloading the real one from Firebase Console. This is only a placeholder showing the expected shape — the values below are NOT valid.",
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "family-tracker",
+    "storage_bucket": "family-tracker.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "android_client_info": {
+          "package_name": "com.family.tracker.agent"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "REPLACE_WITH_REAL_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
