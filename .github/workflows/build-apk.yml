@@ -1,0 +1,53 @@
+name: Build Agent APK
+
+# Builds the Flutter agent into an installable Android APK on GitHub's servers,
+# so no local Flutter/Android Studio setup is needed. The finished APK is
+# uploaded as a downloadable artifact on each run.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/family-location-tracker-build-u23v42
+    paths:
+      - 'agent/**'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.8
+
+      - name: Regenerate missing platform files
+        working-directory: agent
+        # Fills in binary assets not committed to git (launcher icons, the
+        # Gradle wrapper JAR). Never overwrites existing source files.
+        run: flutter create --platforms=android --project-name family_tracker_agent .
+
+      - name: Install dependencies
+        working-directory: agent
+        run: flutter pub get
+
+      - name: Build debug APK
+        working-directory: agent
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-safety-apk
+          path: agent/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
