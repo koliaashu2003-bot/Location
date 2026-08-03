@@ -2,8 +2,14 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
-    // Firebase / Google services
-    id "com.google.gms.google-services"
+}
+
+// Apply the Google Services (Firebase) plugin ONLY when a real
+// google-services.json is present. This lets the app build in "Telegram-only"
+// mode with no Firebase set up, while automatically enabling Firebase the
+// moment you drop a valid google-services.json into this folder.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()
