@@ -53,22 +53,16 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- Background service, declared with location foreground type -->
+        <!-- The flutter_background_service plugin already declares both the
+             BackgroundService and the boot BootReceiver in its own manifest.
+             We do NOT redeclare them (that caused a manifest-merge conflict).
+             We only override the foreground service type to "location" and let
+             tools:replace resolve the android:exported clash with the plugin. -->
         <service
             android:name="id.flutter.flutter_background_service.BackgroundService"
             android:foregroundServiceType="location"
-            android:exported="false" />
-
-        <!-- Re-start the service after device reboot -->
-        <receiver
-            android:name="id.flutter.flutter_background_service.BootReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-            </intent-filter>
-        </receiver>
+            android:exported="false"
+            tools:replace="android:exported,android:foregroundServiceType" />
 
     </application>
 </manifest>
