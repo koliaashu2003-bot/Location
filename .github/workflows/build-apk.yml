@@ -12,6 +12,10 @@ on:
       - 'agent/**'
       - '.github/workflows/build-apk.yml'
 
+permissions:
+  # Needed so the workflow can publish the APK as a GitHub Release asset.
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -45,9 +49,28 @@ jobs:
         working-directory: agent
         run: flutter build apk --debug
 
+      - name: Rename APK
+        run: cp agent/build/app/outputs/flutter-apk/app-debug.apk family-safety.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: family-safety-apk
-          path: agent/build/app/outputs/flutter-apk/app-debug.apk
+          path: family-safety.apk
           if-no-files-found: error
+
+      - name: Publish APK to a GitHub Release
+        # Creates/updates a Release tagged "agent-apk" with the APK attached,
+        # giving a direct, login-free download link that installs on a phone.
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: agent-apk
+          name: Family Safety Agent (Android APK)
+          body: |
+            Latest build of the Family Safety agent app.
+
+            **To install:** download `family-safety.apk` below on the Android
+            phone you want to track, tap it, and allow "install from unknown
+            sources" when prompted. Then open the app, enter your device name +
+            Telegram Bot Token + Chat ID, and tap Start.
+          files: family-safety.apk
