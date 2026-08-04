@@ -126,10 +126,15 @@ void onStart(ServiceInstance service) async {
     final todayKey = '${now.year}-${now.month}-${now.day}';
     if (now.hour == 21 && lastScreenTimeDate != todayKey) {
       lastScreenTimeDate = todayKey;
-      final apps = await screenTimeService.getTodayTopApps(limit: 10);
-      if (apps.isNotEmpty) {
-        await telegram.sendScreenTimeReport(deviceName, apps);
-        await firebaseService.saveScreenTime(deviceId, deviceName, apps);
+      final summary = await screenTimeService.getTodaySummary(limit: 10);
+      if (summary.topApps.isNotEmpty) {
+        await telegram.sendScreenTimeReport(
+          deviceName,
+          summary.topApps,
+          totalMinutes: summary.totalMinutes,
+        );
+        await firebaseService.saveScreenTime(
+            deviceId, deviceName, summary.topApps);
       }
     }
   }

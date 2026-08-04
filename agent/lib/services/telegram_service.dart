@@ -31,19 +31,31 @@ class TelegramService {
     return _send(message);
   }
 
-  /// Sends the daily screen time report.
+  /// Sends the daily screen time report, including the total across all apps
+  /// and the per-app breakdown (both shown in hours and minutes).
   Future<bool> sendScreenTimeReport(
     String deviceName,
-    List<AppUsage> apps,
-  ) async {
+    List<AppUsage> apps, {
+    int totalMinutes = 0,
+  }) async {
     final buffer = StringBuffer()
       ..writeln('📱 Screen Time Report')
-      ..writeln("$deviceName's usage today:");
+      ..writeln("$deviceName's usage today:")
+      ..writeln('Total screen time: ${_formatMinutes(totalMinutes)}')
+      ..writeln('');
     for (var i = 0; i < apps.length; i++) {
       final app = apps[i];
       buffer.writeln('${i + 1}. ${app.appName} - ${app.formattedDuration}');
     }
     return _send(buffer.toString().trimRight());
+  }
+
+  /// Formats a minute count as "Xh Ym" (or "Ym" when under an hour).
+  String _formatMinutes(int minutes) {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0) return '${hours}h ${mins}m';
+    return '${mins}m';
   }
 
   Future<bool> _send(String text) async {
