@@ -6,7 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/location_service.dart';
 import '../services/screen_time_service.dart';
+import 'dashboard_screen.dart';
 
+/// Child-side screen: set up once, then tap "Grant Access" to start.
+/// Stopping is locked behind a Parent PIN so only the parent/owner can stop it.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -18,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _deviceNameCtrl = TextEditingController();
   final _botTokenCtrl = TextEditingController();
   final _chatIdCtrl = TextEditingController();
-  final _projectIdCtrl = TextEditingController();
+  final _pinCtrl = TextEditingController();
 
   final _locationService = LocationService();
   final _screenTimeService = ScreenTimeService();
@@ -39,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _deviceNameCtrl.dispose();
     _botTokenCtrl.dispose();
     _chatIdCtrl.dispose();
-    _projectIdCtrl.dispose();
+    _pinCtrl.dispose();
     super.dispose();
   }
 
@@ -49,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _deviceNameCtrl.text = prefs.getString('deviceName') ?? '';
       _botTokenCtrl.text = prefs.getString('botToken') ?? '';
       _chatIdCtrl.text = prefs.getString('chatId') ?? '';
-      _projectIdCtrl.text = prefs.getString('projectId') ?? '';
+      _pinCtrl.text = prefs.getString('parentPin') ?? '';
       _tracking = prefs.getBool('tracking') ?? false;
       _lastLocationTime = prefs.getString('lastLocationTime');
     });
@@ -65,17 +68,16 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setString('deviceName', _deviceNameCtrl.text.trim());
     await prefs.setString('botToken', _botTokenCtrl.text.trim());
     await prefs.setString('chatId', _chatIdCtrl.text.trim());
-    await prefs.setString('projectId', _projectIdCtrl.text.trim());
+    await prefs.setString('parentPin', _pinCtrl.text.trim());
 
-    // Derive a stable deviceId from the device name if not already set.
     if (prefs.getString('deviceId') == null) {
       final id = _deviceNameCtrl.text
           .trim()
           .toLowerCase()
           .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
           .replaceAll(RegExp(r'^-+|-+$'), '');
-      await prefs.setString(
-          'deviceId', id.isEmpty ? 'device-${DateTime.now().millisecondsSinceEpoch}' : id);
+      await prefs.setString('deviceId',
+          id.isEmpty ? 'device-${DateTime.now().millisecondsSinceEpoch}' : id);
     }
 
     if (mounted) {
@@ -86,7 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<bool> _requestPermissions() async {
-    // Location permissions (foreground + background).
     try {
       await _locationService.ensurePermissions();
     } on LocationServiceException catch (e) {
@@ -97,7 +98,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await Permission.locationAlways.request();
     await Permission.notification.request();
 
-    // Battery optimization exemption so Android does not kill the service.
     if (!await Permission.ignoreBatteryOptimizations.isGranted) {
       await Permission.ignoreBatteryOptimizations.request();
     }
@@ -105,38 +105,76 @@ class _HomeScreenState extends State<HomeScreen> {
     return true;
   }
 
-  Future<void> _toggleTracking(bool value) async {
-    if (value) {
-      // Validate required fields.
-      if (_deviceNameCtrl.text.trim().isEmpty ||
-          _botTokenCtrl.text.trim().isEmpty ||
-          _chatIdCtrl.text.trim().isEmpty) {
-        _showError('Please enter device name, bot token and chat ID first.');
-        return;
-      }
-
-      await _saveSettings();
-      final ok = await _requestPermissions();
-      if (!ok) return;
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('tracking', true);
-
-      final service = FlutterBackgroundService();
-      if (!await service.isRunning()) {
-        await service.startService();
-      }
-
-      setState(() => _tracking = true);
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('tracking', false);
-
-      final service = FlutterBackgroundService();
-      service.invoke('stopService');
-
-      setState(() => _tracking = false);
+  /// Starts tracking. One-way for the child — there is no "stop" here without
+  /// the Parent PIN.
+  Future<void> _grantAndStart() async {
+    if (_deviceNameCtrl.text.trim().isEmpty ||
+        _botTokenCtrl.text.trim().isEmpty ||
+        _chatIdCtrl.text.trim().isEmpty) {
+      _showError('Enter device name, bot token and chat ID first.');
+      return;
     }
+    if (_pinCtrl.text.trim().length < 4) {
+      _showError('Set a Parent PIN (at least 4 digits) so only you can stop it.');
+      return;
+    }
+
+    await _saveSettings();
+    final ok = await _requestPermissions();
+    if (!ok) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('tracking', true);
+
+    final service = FlutterBackgroundService();
+    if (!await service.isRunning()) {
+      await service.startService();
+    }
+
+    setState(() => _tracking = true);
+  }
+
+  /// Stopping requires the Parent PIN — the child cannot stop on their own.
+  Future<void> _stopWithPin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedPin = prefs.getString('parentPin') ?? '';
+
+    if (!mounted) return;
+    final entered = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        final ctrl = TextEditingController();
+        return AlertDialog(
+          title: const Text('Enter Parent PIN to stop'),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            decoration: const InputDecoration(hintText: 'Parent PIN'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+              child: const Text('Stop'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (entered == null) return; // cancelled
+    if (entered != savedPin) {
+      _showError('Wrong PIN. Only the parent can stop tracking.');
+      return;
+    }
+
+    await prefs.setBool('tracking', false);
+    FlutterBackgroundService().invoke('stopService');
+    setState(() => _tracking = false);
   }
 
   void _showError(String message) {
@@ -146,13 +184,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openDashboard() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DashboardScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Family Safety'),
-        backgroundColor: Colors.indigo,
+        title: const Text('Child · Family Safety'),
+        backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.dashboard),
+            tooltip: 'Dashboard',
+            onPressed: _openDashboard,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -167,17 +218,29 @@ class _HomeScreenState extends State<HomeScreen> {
             _textField(_botTokenCtrl, 'Telegram Bot Token',
                 '123456:ABC-DEF...', obscure: true),
             _textField(_chatIdCtrl, 'Telegram Chat ID', 'e.g. 987654321'),
-            _textField(_projectIdCtrl, 'Firebase Project ID',
-                'e.g. family-tracker'),
+            _textField(_pinCtrl, 'Parent PIN (needed to stop tracking)',
+                'e.g. 1234', obscure: true, number: true),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _saveSettings,
-              icon: const Icon(Icons.save),
-              label: const Text('Save Settings'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+            if (!_tracking)
+              ElevatedButton.icon(
+                onPressed: _grantAndStart,
+                icon: const Icon(Icons.verified_user),
+                label: const Text('Grant Access & Start Tracking'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: _saveSettings,
+                icon: const Icon(Icons.save),
+                label: const Text('Save Settings'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -197,25 +260,49 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Icon(
+                  _tracking ? Icons.shield : Icons.shield_outlined,
+                  color: _tracking ? Colors.green : Colors.grey,
+                ),
+                const SizedBox(width: 8),
                 Text(
-                  _tracking ? 'Tracking Active' : 'Stopped',
+                  _tracking ? 'Tracking Active' : 'Not Tracking',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: _tracking ? Colors.green : Colors.grey,
                   ),
                 ),
-                Switch(
-                  value: _tracking,
-                  activeThumbColor: Colors.green,
-                  onChanged: _toggleTracking,
-                ),
               ],
             ),
             const SizedBox(height: 8),
             Text('Last location sent: $lastTime'),
+            if (_tracking) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _openDashboard,
+                      icon: const Icon(Icons.dashboard),
+                      label: const Text('Dashboard'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _stopWithPin,
+                      icon: const Icon(Icons.lock),
+                      label: const Text('Stop (PIN)'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -258,12 +345,15 @@ class _HomeScreenState extends State<HomeScreen> {
     String label,
     String hint, {
     bool obscure = false,
+    bool number = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: TextField(
         controller: controller,
         obscureText: obscure,
+        enabled: !_tracking, // lock config while tracking is active
+        keyboardType: number ? TextInputType.number : TextInputType.text,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,

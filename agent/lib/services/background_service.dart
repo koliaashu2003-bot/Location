@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_service.dart';
+import 'local_store.dart';
 import 'location_service.dart';
 import 'screen_time_service.dart';
 import 'telegram_service.dart';
@@ -85,6 +86,7 @@ void onStart(ServiceInstance service) async {
   final locationService = LocationService();
   final firebaseService = FirebaseService();
   final screenTimeService = ScreenTimeService();
+  final localStore = LocalStore();
 
   // Track the last day we sent a screen-time report to avoid duplicates.
   String? lastScreenTimeDate;
@@ -108,6 +110,7 @@ void onStart(ServiceInstance service) async {
     if (location != null) {
       await telegram.sendLocation(location);
       await firebaseService.saveLocation(deviceId, location);
+      await localStore.addLocation(location); // on-device 3-day history
 
       await prefs.setString(
           'lastLocationTime', location.timestamp.toIso8601String());
@@ -121,12 +124,23 @@ void onStart(ServiceInstance service) async {
       }
     }
 
-    // --- Daily screen-time report at 9 PM ---
+    // --- Screen time ---
     final now = DateTime.now();
     final todayKey = '${now.year}-${now.month}-${now.day}';
+    final todayDate = '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+
+    final summary = await screenTimeService.getTodaySummary(limit: 10);
+    if (summary.topApps.isNotEmpty) {
+      // Keep the on-device dashboard current on every cycle.
+      await localStore.saveScreenTime(
+          todayDate, summary.totalMinutes, summary.topApps);
+    }
+
+    // Daily screen-time report to Telegram at 9 PM (once per day).
     if (now.hour == 21 && lastScreenTimeDate != todayKey) {
       lastScreenTimeDate = todayKey;
-      final summary = await screenTimeService.getTodaySummary(limit: 10);
       if (summary.topApps.isNotEmpty) {
         await telegram.sendScreenTimeReport(
           deviceName,
