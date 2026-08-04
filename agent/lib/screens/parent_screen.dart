@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'parent_dashboard_screen.dart';
+import 'supabase_setup_screen.dart';
+
 /// Parent-side screen. The parent does not track from this phone — everything
 /// arrives in their Telegram. This screen helps them share the app with their
 /// children (up to 4 phones) and explains the one-time setup.
@@ -38,6 +41,38 @@ class ParentScreen extends StatelessWidget {
               'Telegram. You do not track from this phone — install the app on '
               'each child\'s phone (up to 4), choose "Child" there, enter your '
               'Telegram bot details, and they tap Allow to start.',
+            ),
+          ),
+          _sectionCard(
+            icon: Icons.dashboard_customize,
+            title: 'Family Dashboard (Supabase)',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'For an in-app dashboard of every child\'s location and '
+                  'screen time, set up the free Supabase backend (same details '
+                  'on this phone and each child phone).',
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const SupabaseSetupScreen()),
+                  ),
+                  icon: const Icon(Icons.settings),
+                  label: const Text('Supabase setup'),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const ParentDashboardScreen()),
+                  ),
+                  icon: const Icon(Icons.dashboard),
+                  label: const Text('Open Family Dashboard'),
+                ),
+              ],
             ),
           ),
           _sectionCard(

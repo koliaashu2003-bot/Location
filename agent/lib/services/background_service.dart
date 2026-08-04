@@ -11,6 +11,7 @@ import 'firebase_service.dart';
 import 'local_store.dart';
 import 'location_service.dart';
 import 'screen_time_service.dart';
+import 'supabase_service.dart';
 import 'telegram_service.dart';
 
 /// Notification channel used by the persistent foreground notification.
@@ -105,12 +106,22 @@ void onStart(ServiceInstance service) async {
 
     final telegram = TelegramService(botToken: botToken, chatId: chatId);
 
+    // Optional Supabase backend (child writes here for the parent dashboard).
+    final supabase = SupabaseService(SupabaseConfig(
+      url: prefs.getString('sb_url') ?? '',
+      anonKey: prefs.getString('sb_key') ?? '',
+      email: prefs.getString('sb_email') ?? '',
+      password: prefs.getString('sb_password') ?? '',
+    ));
+
     // --- Location update ---
     final location = await locationService.getCurrentLocation(deviceName);
     if (location != null) {
       await telegram.sendLocation(location);
       await firebaseService.saveLocation(deviceId, location);
       await localStore.addLocation(location); // on-device 3-day history
+      await supabase.insertLocation(deviceId, location);
+      await supabase.pruneOld(deviceId, days: LocalStore.retentionDays);
 
       await prefs.setString(
           'lastLocationTime', location.timestamp.toIso8601String());
@@ -136,6 +147,9 @@ void onStart(ServiceInstance service) async {
       // Keep the on-device dashboard current on every cycle.
       await localStore.saveScreenTime(
           todayDate, summary.totalMinutes, summary.topApps);
+      // Mirror to Supabase so the parent dashboard can read it remotely.
+      await supabase.upsertScreenTime(
+          deviceId, deviceName, todayDate, summary.totalMinutes, summary.topApps);
     }
 
     // Daily screen-time report to Telegram at 9 PM (once per day).

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/location_service.dart';
 import '../services/screen_time_service.dart';
 import 'dashboard_screen.dart';
+import 'supabase_setup_screen.dart';
 
 /// Child-side screen: set up once, then tap "Grant Access" to start.
 /// Stopping is locked behind a Parent PIN so only the parent/owner can stop it.
@@ -220,7 +221,18 @@ class _HomeScreenState extends State<HomeScreen> {
             _textField(_chatIdCtrl, 'Telegram Chat ID', 'e.g. 987654321'),
             _textField(_pinCtrl, 'Parent PIN (needed to stop tracking)',
                 'e.g. 1234', obscure: true, number: true),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _tracking
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const SupabaseSetupScreen()),
+                      ),
+              icon: const Icon(Icons.cloud_outlined),
+              label: const Text('Supabase setup (optional, for dashboard)'),
+            ),
+            const SizedBox(height: 8),
             if (!_tracking)
               ElevatedButton.icon(
                 onPressed: _grantAndStart,
